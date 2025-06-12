@@ -1,4 +1,3 @@
-
 from flask import Flask, request, render_template, redirect, url_for, send_file
 import pandas as pd
 import os
@@ -40,56 +39,50 @@ def entry(mode=None):
         current_index = 0
         return redirect(url_for('entry'))
 
-    items = [
-        i for i in range(len(product_data))
-        if view_mode == 'all' or i in skipped_indices
-    ]
+    # Determine the current list of items based on view_mode
+    if view_mode == 'all':
+        items = [i for i in range(len(product_data))]
+    elif view_mode == 'skipped':
+        items = [i for i in range(len(product_data)) if not product_data[i]['Price']]
+    else:
+        items = []
 
     if request.method == 'POST':
-        real_index = items[current_index]
-        action = request.form.get('action')
-        price = request.form.get('price')
+        if current_index < len(items):
+            real_index = items[current_index]
+            action = request.form.get('action')
+            price = request.form.get('price')
 
-        if action == 'save' and price:
-            product_data[real_index]['Price'] = price
-            skipped_indices.discard(real_index)
-        elif action == 'skip':
-            skipped_indices.add(real_index)
-        elif action == 'back':
-            current_index = max(0, current_index - 1)
-            return redirect(url_for('entry'))
+            if action == 'save' and price:
+                product_data[real_index]['Price'] = price
+                skipped_indices.discard(real_index)
+            elif action == 'skip':
+                skipped_indices.add(real_index)
+            elif action == 'back':
+                current_index = max(0, current_index - 1)
+                return redirect(url_for('entry'))
 
-        if current_index < len(items) - 1:
-            current_index += 1
-            return redirect(url_for('entry'))
-        else:
-            items = [
-                i for i in range(len(product_data))
-                if view_mode == 'all' or i in skipped_indices
-            ]
-            if current_index >= len(items):
-                items = [
-                    i for i in range(len(product_data))
-                    if view_mode == 'all' or i in skipped_indices
-                ]
-                if not items:
-                    return redirect(url_for('complete'))
-                else:
-                    current_index = 0
-                    return redirect(url_for('entry'))
+            if current_index < len(items) - 1:
+                current_index += 1
+            else:
+                current_index += 1
+
+        return redirect(url_for('entry'))
 
     if current_index < len(items):
         real_index = items[current_index]
         item = product_data[real_index]
         filled_count = sum(1 for p in product_data if p['Price'])
+        skipped_count = sum(1 for p in product_data if not p['Price'])
         return render_template('entry.html', item=item, index=current_index + 1, current=real_index,
-                               total=len(items), filled=filled_count, skipped=len(skipped_indices), view=view_mode)
+                               total=len(items), filled=filled_count, skipped=skipped_count, view=view_mode)
 
     return redirect(url_for('complete'))
 
 @app.route('/complete')
 def complete():
-    return render_template('complete.html', skipped=len(skipped_indices))
+    skipped_count = sum(1 for p in product_data if not p['Price'])
+    return render_template('complete.html', skipped=skipped_count)
 
 @app.route('/export')
 def export():
